@@ -1,0 +1,85 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=drivehealth
+      - POSTGRES_USER=drivehealth
+      - POSTGRES_PASSWORD=drivehealth_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U drivehealth"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    command: gunicorn drivehealth.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 300
+    ports:
+      - "8080:8000"
+    volumes:
+      - ./media:/app/media
+      - ./temp:/app/temp
+      - ./:/app
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=your-secret-key-here
+      - DATABASE_URL=postgresql://drivehealth:drivehealth_password@db:5432/drivehealth
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - db
+    restart: unless-stopped
+
+  celery_worker:
+    build: .
+    command: celery -A drivehealth worker --loglevel=info --concurrency=2
+    volumes:
+      - ./media:/app/media
+      - ./temp:/app/temp
+      - ./:/app
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=your-secret-key-here
+      - DATABASE_URL=postgresql://drivehealth:drivehealth_password@db:5432/drivehealth
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - db
+    restart: unless-stopped
+
+  celery_beat:
+    build: .
+    command: celery -A drivehealth beat --loglevel=info
+    volumes:
+      - ./:/app
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=your-secret-key-here
+      - DATABASE_URL=postgresql://drivehealth:drivehealth_password@db:5432/drivehealth
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - db
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:
