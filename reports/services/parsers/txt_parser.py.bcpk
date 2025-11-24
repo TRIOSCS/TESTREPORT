@@ -1,0 +1,86 @@
+import re
+import logging
+from typing import List, Dict, Any
+from .base import ParserBase
+from ..vendor import derive_vendor
+# Import shared parsing functions from html_parser
+from .html_parser import (
+    SERIAL_PATTERNS, MODEL_PATTERNS, VENDOR_INFO_PATTERNS,
+    HEALTH_PATTERNS, REALLOC_PATTERNS, GROWN_DEFECT_PATTERNS,
+    extract_first, clean_single_line, split_into_drive_sections,
+    try_read_with_encoding
+)
+
+logger = logging.getLogger(__name__)
+
+
+class TXTParser(ParserBase):
+    """Parser for TXT Hard Disk Sentinel reports"""
+    
+    def parse(self, file_path: str, file_name: str) -> List[Dict[str, Any]]:
+        """Parse TXT file and extract drive information"""
+        try:
+            # Use improved encoding detection
+            content, encoding, attempted = try_read_with_encoding(file_path)
+            logger.info(f"Read {file_name} with encoding: {encoding}")
+            
+            # Use improved section splitting
+            drives = []
+            drive_sections = split_into_drive_sections(content)
+            
+            for section in drive_sections:
+                drive_data = self._extract_drive_data(section, file_name)
+                if drive_data and drive_data.get('VPD Serial'):
+                    drives.append(drive_data)
+            
+            return drives if drives else [self._create_error_drive(file_name, "No recognizable drive blocks found")]
+            
+        except Exception as e:
+            logger.error(f"Error parsing TXT file {file_name}: {e}")
+            return [self._create_error_drive(file_name, str(e))]
+    
+    def _extract_drive_data(self, section: str, file_name: str) -> Dict[str, Any]:
+        """Extract drive data from a text section using enhanced pattern matching"""
+        # Use the improved extraction methods
+        vpd = extract_first(SERIAL_PATTERNS, section)
+        model = clean_single_line(extract_first(MODEL_PATTERNS, section))
+        vendor_info = clean_single_line(extract_first(VENDOR_INFO_PATTERNS, section))
+        health = extract_first(HEALTH_PATTERNS, section)
+        realloc = extract_first(REALLOC_PATTERNS, section)
+        grown = extract_first(GROWN_DEFECT_PATTERNS, section)
+        
+        label = vpd[:8] if vpd else ""
+        vendor = derive_vendor(model) if model else "Unknown"
+        
+        try:
+            health_val = int(health) if health else 0
+        except Exception:
+            health_val = 0
+        
+        try:
+            realloc_val = int(realloc) if realloc else 0
+        except Exception:
+            realloc_val = 0
+        
+        try:
+            grown_val = int(grown) if grown else 0
+        except Exception:
+            grown_val = 0
+        
+        return {
+            "Label Serial": label,
+            "VPD Serial": vpd,
+            "Model Number": model,
+            "Vendor Information": vendor_info,
+            "Vendor": vendor,
+            "File Name": file_name,
+            "Health Score": health_val,
+            "Allocated Sections": realloc_val,
+            "Grown Defects": grown_val,
+        }
+    
+    def _create_error_drive(self, file_name: str, error_message: str) -> Dict[str, Any]:
+        """Create a drive entry for parsing errors"""
+        drive_data = self.get_default_drive_data(file_name)
+        drive_data['Parsing Error'] = error_message
+        return drive_data

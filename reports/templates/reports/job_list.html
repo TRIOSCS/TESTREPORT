@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processing Jobs - Drive Health Parser</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        .jobs-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .jobs-table th,
+        .jobs-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .jobs-table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        .jobs-table tr:hover {
+            background-color: #f8f9fa;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-pending {
+            background-color: #ffc107;
+            color: #000;
+        }
+        .status-processing {
+            background-color: #17a2b8;
+            color: white;
+        }
+        .status-completed {
+            background-color: #28a745;
+            color: white;
+        }
+        .status-failed {
+            background-color: #dc3545;
+            color: white;
+        }
+        .actions {
+            white-space: nowrap;
+        }
+        .action-link {
+            color: #007bff;
+            text-decoration: none;
+            margin-right: 10px;
+        }
+        .action-link:hover {
+            text-decoration: underline;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6c757d;
+        }
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-actions">
+            <h1>📊 Processing Jobs</h1>
+            <div>
+                <a href="{% url 'upload' %}" class="btn">+ New Upload</a>
+                <button onclick="location.reload()" class="btn btn-secondary">🔄 Refresh</button>
+            </div>
+        </div>
+
+        {% if jobs %}
+        <table class="jobs-table">
+            <thead>
+                <tr>
+                    <th>Job ID</th>
+                    <th>Files</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Results</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for job in jobs %}
+                <tr>
+                    <td>
+                        <a href="{% url 'job_status' job.id %}" class="action-link">
+                            {{ job.id|truncatechars:13 }}
+                        </a>
+                    </td>
+                    <td>
+                        {{ job.total_files }} file(s)
+                        {% if job.uploaded_files %}
+                        <br><small style="color: #6c757d;">{{ job.uploaded_files.0 }}{% if job.uploaded_files|length > 1 %}, +{{ job.uploaded_files|length|add:-1 }} more{% endif %}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="status-badge status-{{ job.status|lower }}">
+                            {{ job.get_status_display }}
+                        </span>
+                    </td>
+                    <td>
+                        {{ job.created_at|date:"Y-m-d H:i" }}
+                    </td>
+                    <td>
+                        {% if job.status == 'COMPLETED' %}
+                            {{ job.total_drives }} drive(s)
+                            {% if job.duplicates_removed > 0 %}
+                                <br><small style="color: #6c757d;">{{ job.duplicates_removed }} dup(s) removed</small>
+                            {% endif %}
+                        {% elif job.status == 'FAILED' %}
+                            <span style="color: #dc3545;">Failed</span>
+                        {% else %}
+                            <span style="color: #6c757d;">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="actions">
+                        <a href="{% url 'job_status' job.id %}" class="action-link">View</a>
+                        {% if job.status == 'COMPLETED' %}
+                            <a href="{% url 'download_job' job.id %}?type=xlsx" class="action-link">📥 Excel</a>
+                            <a href="{% url 'download_job' job.id %}?type=csv" class="action-link">📄 CSV</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h3>No jobs yet</h3>
+            <p>Upload files to start processing</p>
+            <a href="{% url 'upload' %}" class="btn" style="margin-top: 20px;">Upload Files</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        // Auto-refresh every 5 seconds if there are pending/processing jobs
+        const hasPendingJobs = {{ jobs|length }} > 0 && [{% for job in jobs %}'{{ job.status }}'{% if not forloop.last %},{% endif %}{% endfor %}].some(s => s === 'PENDING' || s === 'PROCESSING');
+        
+        if (hasPendingJobs) {
+            setTimeout(() => location.reload(), 5000);
+        }
+    </script>
+</body>
+</html>
+
