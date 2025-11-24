@@ -31,7 +31,7 @@ db.sqlite3-journal
 /media
 /staticfiles
 /static
-celerybeat-schedule
+celerybeat-schedule*
 celerybeat.pid
 
 # IDE

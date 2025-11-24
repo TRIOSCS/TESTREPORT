@@ -67,9 +67,10 @@ services:
 
   celery_beat:
     build: .
-    command: celery -A drivehealth beat --loglevel=info
+    command: celery -A drivehealth beat --loglevel=info --schedule=/tmp/celerybeat-schedule
     volumes:
       - ./:/app
+      - celery_beat_data:/tmp
     environment:
       - DEBUG=True
       - SECRET_KEY=your-secret-key-here
@@ -83,3 +84,4 @@ services:
 volumes:
   redis_data:
   postgres_data:
+  celery_beat_data:
