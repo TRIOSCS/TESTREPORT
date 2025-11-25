@@ -44,8 +44,10 @@ services:
       - DATABASE_URL=postgresql://drivehealth:drivehealth_password@db:5432/drivehealth
       - CELERY_BROKER_URL=redis://redis:6379/0
     depends_on:
-      - redis
-      - db
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   celery_worker:
@@ -61,8 +63,12 @@ services:
       - DATABASE_URL=postgresql://drivehealth:drivehealth_password@db:5432/drivehealth
       - CELERY_BROKER_URL=redis://redis:6379/0
     depends_on:
-      - redis
-      - db
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
     restart: unless-stopped
 
   celery_beat:
@@ -77,8 +83,12 @@ services:
       - DATABASE_URL=postgresql://drivehealth:drivehealth_password@db:5432/drivehealth
       - CELERY_BROKER_URL=redis://redis:6379/0
     depends_on:
-      - redis
-      - db
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
     restart: unless-stopped
 
 volumes:

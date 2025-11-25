@@ -15,6 +15,7 @@ RUN apt-get update \
         libxslt-dev \
         gcc \
         g++ \
+        netcat-traditional \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
@@ -24,11 +25,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project
 COPY . .
 
+# Copy and set permissions for entrypoint
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Create necessary directories
 RUN mkdir -p media/results media/errors temp staticfiles
-
-# Collect static files
-RUN python manage.py collectstatic --noinput
 
 # Create a non-root user
 RUN adduser --disabled-password --gecos '' appuser
@@ -38,5 +40,8 @@ USER appuser
 # Expose port
 EXPOSE 8000
 
-# Run the application with Django development server
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# Set entrypoint
+ENTRYPOINT ["docker-entrypoint.sh"]
+
+# Default command (can be overridden)
+CMD ["gunicorn", "drivehealth.wsgi:application", "--bind", "0.0.0.0:8000"]
