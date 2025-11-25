@@ -52,7 +52,7 @@ services:
 
   celery_worker:
     build: .
-    command: celery -A drivehealth worker --loglevel=info --concurrency=2
+    command: su appuser -c "celery -A drivehealth worker --loglevel=info --concurrency=2"
     volumes:
       - ./media:/app/media
       - ./temp:/app/temp
@@ -73,7 +73,7 @@ services:
 
   celery_beat:
     build: .
-    command: celery -A drivehealth beat --loglevel=info --schedule=/tmp/celerybeat-schedule
+    command: su appuser -c "celery -A drivehealth beat --loglevel=info --schedule=/tmp/celerybeat-schedule"
     volumes:
       - ./:/app
       - celery_beat_data:/tmp

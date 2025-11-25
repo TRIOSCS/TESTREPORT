@@ -29,13 +29,14 @@ COPY . .
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Create necessary directories
-RUN mkdir -p media/results media/errors temp staticfiles
-
-# Create a non-root user
+# Create a non-root user first
 RUN adduser --disabled-password --gecos '' appuser
+
+# Create necessary directories
+RUN mkdir -p media/results media/errors media/uploads temp staticfiles
 RUN chown -R appuser:appuser /app
-USER appuser
+
+# Keep running as root - entrypoint will handle permissions and switch user for Django
 
 # Expose port
 EXPOSE 8000
@@ -43,5 +44,5 @@ EXPOSE 8000
 # Set entrypoint
 ENTRYPOINT ["docker-entrypoint.sh"]
 
-# Default command (can be overridden)
-CMD ["gunicorn", "drivehealth.wsgi:application", "--bind", "0.0.0.0:8000"]
+# Default command (can be overridden) - run as appuser
+CMD ["su", "appuser", "-c", "gunicorn drivehealth.wsgi:application --bind 0.0.0.0:8000"]
