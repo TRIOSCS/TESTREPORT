@@ -1,6 +1,6 @@
-# TESTREPORT
+# Trio Test Report Parser
 
-Django application for compiling test reports.
+Django application for parsing and analyzing hard disk diagnostic test reports from HTML, TXT, and PDF formats.
 
 ## Prerequisites
 
@@ -77,6 +77,16 @@ docker-compose exec web python manage.py createsuperuser
 ./manage.sh shell          # Django shell
 ```
 
+## Features
+
+- Parse hard disk diagnostic reports from HTML, TXT, and PDF formats
+- Support for ZIP file uploads with automatic extraction
+- Background job processing with Celery
+- Duplicate drive detection and removal
+- Export results to Excel and CSV formats
+- Real-time job status tracking
+- Parse error reporting and logging
+
 ## Services
 
 - **Web**: Django application (port 8080)
@@ -91,3 +101,10 @@ docker-compose exec web python manage.py createsuperuser
 - `SECRET_KEY`: Django secret key
 - `DATABASE_URL`: PostgreSQL connection string
 - `CELERY_BROKER_URL`: Redis connection string
+
+## Supported File Formats
+
+- **HTML**: Hard Disk Sentinel reports
+- **TXT**: SCSI Toolbox and text-based diagnostic reports
+- **PDF**: PDF diagnostic reports (using pdfminer.six)
+- **ZIP**: Compressed archives containing any of the above formats
