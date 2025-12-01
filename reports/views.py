@@ -32,7 +32,13 @@ def upload_view(request):
 
 
 def submit_parsing_job(request, uploaded_files):
-    """Submit files for background processing"""
+    """
+    Submit files for background processing.
+    Supports:
+    - Individual files (HTML, TXT, PDF)
+    - ZIP archives (with nested folders and files)
+    - Multiple files at once
+    """
     try:
         # Create upload directory
         upload_dir = os.path.join(settings.MEDIA_ROOT, 'uploads')
@@ -46,12 +52,27 @@ def submit_parsing_job(request, uploaded_files):
             file_name = uploaded_file.name
             file_names.append(file_name)
             
+            # Preserve folder structure in filename if present
+            # Handle paths with forward slashes (from folder uploads)
+            if '/' in file_name:
+                # Create nested directory structure
+                file_dir = os.path.join(upload_dir, os.path.dirname(file_name))
+                os.makedirs(file_dir, exist_ok=True)
+                file_path = os.path.join(upload_dir, file_name)
+            else:
+                # Simple file without folder structure
+                file_path = os.path.join(upload_dir, f"{os.urandom(8).hex()}_{file_name}")
+            
             # Save file
-            file_path = os.path.join(upload_dir, f"{os.urandom(8).hex()}_{file_name}")
             with open(file_path, 'wb+') as destination:
                 for chunk in uploaded_file.chunks():
                     destination.write(chunk)
             file_paths.append(file_path)
+        
+        if not file_paths:
+            return render(request, 'reports/upload.html', {
+                'error_message': 'No files were uploaded. Please select files to process.'
+            })
         
         # Create job record
         job = ParsingJob.objects.create(

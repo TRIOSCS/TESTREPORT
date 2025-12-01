@@ -23,37 +23,62 @@ def _is_zip_file(file_path: str) -> bool:
 
 
 def _extract_zip(zip_path: str, extract_dir: str) -> list:
-    """Recursively extract zip files"""
+    """
+    Recursively extract zip files and handle nested folder structures.
+    Supports:
+    - Nested ZIP files (ZIP within ZIP)
+    - Nested folders within ZIP
+    - Multiple levels of nesting
+    """
     extracted_files = []
     supported_extensions = {'.html', '.txt', '.pdf'}
     
     try:
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            for member in zip_ref.namelist():
-                # Skip directories and hidden files
-                if member.endswith('/') or member.startswith('.') or member.startswith('__MACOSX'):
-                    continue
+            # Extract all files while preserving folder structure
+            zip_ref.extractall(extract_dir)
+            
+            # Now walk through extracted directory to find supported files
+            for root, dirs, files in os.walk(extract_dir):
+                # Skip hidden folders and __MACOSX
+                dirs[:] = [d for d in dirs if not d.startswith('.') and d != '__MACOSX']
                 
-                # Extract file
-                zip_ref.extract(member, extract_dir)
-                extracted_path = os.path.join(extract_dir, member)
-                
-                # Check if extracted file is another zip
-                if _is_zip_file(extracted_path):
-                    # Recursively extract nested zip
-                    nested_files = _extract_zip(extracted_path, extract_dir)
-                    extracted_files.extend(nested_files)
-                    # Remove the zip file after extraction
-                    os.remove(extracted_path)
-                else:
-                    # Check if it's a supported file type
-                    file_ext = Path(extracted_path).suffix.lower()
-                    if file_ext in supported_extensions:
-                        extracted_files.append(extracted_path)
+                for file in files:
+                    # Skip hidden files
+                    if file.startswith('.'):
+                        continue
+                    
+                    file_path = os.path.join(root, file)
+                    
+                    # Check if it's a nested ZIP file
+                    if _is_zip_file(file_path):
+                        logger.info(f"Found nested ZIP: {file}")
+                        # Create subdirectory for nested ZIP extraction
+                        nested_extract_dir = os.path.join(root, f"{file}_extracted")
+                        os.makedirs(nested_extract_dir, exist_ok=True)
+                        
+                        # Recursively extract nested ZIP
+                        nested_files = _extract_zip(file_path, nested_extract_dir)
+                        extracted_files.extend(nested_files)
+                        
+                        # Remove the ZIP file after extraction
+                        try:
+                            os.remove(file_path)
+                        except:
+                            pass
                     else:
-                        # Remove unsupported files
-                        logger.debug(f"Removing unsupported file: {extracted_path}")
-                        os.remove(extracted_path)
+                        # Check if it's a supported file type
+                        file_ext = Path(file_path).suffix.lower()
+                        if file_ext in supported_extensions:
+                            extracted_files.append(file_path)
+                            logger.debug(f"Found supported file: {file} in {root}")
+                        else:
+                            # Remove unsupported files
+                            logger.debug(f"Removing unsupported file: {file}")
+                            try:
+                                os.remove(file_path)
+                            except:
+                                pass
     
     except Exception as e:
         logger.error(f"Error extracting zip file {zip_path}: {e}")

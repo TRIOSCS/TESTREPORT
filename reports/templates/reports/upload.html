@@ -77,6 +77,19 @@
         .limits ul {
             margin-bottom: 0;
         }
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 0 5px;
+        }
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
     </style>
 </head>
 <body>
@@ -97,7 +110,7 @@
                 </div>
             {% endif %}
 
-            <!-- Keep input PERSISTENT; do NOT replace it -->
+            <!-- File input for individual files -->
             <input type="file"
                    name="files"
                    id="id_files"
@@ -106,10 +119,29 @@
                    class="form-control"
                    style="display:none">
 
+            <!-- Folder input for directory uploads -->
+            <input type="file"
+                   name="files"
+                   id="id_folder"
+                   webkitdirectory
+                   directory
+                   multiple
+                   class="form-control"
+                   style="display:none">
+
             <div class="upload-area" id="uploadArea">
-                <p>📁 Drag and drop files here or click to select</p>
+                <p>📁 Drag and drop files/folders here or click to select</p>
                 <p>Supported formats: .html, .txt, .pdf, .zip</p>
-                <p><strong>You can select multiple files at once!</strong></p>
+                <p><strong>You can select multiple files or entire folders!</strong></p>
+            </div>
+            
+            <div style="text-align: center; margin: 15px 0;">
+                <button type="button" id="selectFilesBtn" class="btn-secondary">
+                    📄 Select Files
+                </button>
+                <button type="button" id="selectFolderBtn" class="btn-secondary">
+                    📁 Select Folder
+                </button>
             </div>
 
             <!-- Separate, dedicated preview area -->
@@ -123,22 +155,32 @@
         </form>
         
         <div class="limits">
+            <h3>Upload Options</h3>
+            <ul>
+                <li>✅ <strong>Individual Files:</strong> Select one or more .html, .txt, .pdf, or .zip files</li>
+                <li>✅ <strong>Folders:</strong> Upload entire folders with nested subfolders</li>
+                <li>✅ <strong>ZIP Archives:</strong> Automatically extracts nested folders and ZIPs within ZIPs</li>
+                <li>✅ <strong>Drag & Drop:</strong> Drag files or folders directly to the upload area</li>
+            </ul>
             <h3>Upload Limits</h3>
             <ul>
                 <li>Single file size: Maximum 100 MB</li>
                 <li>Total upload size: Maximum 200 MB</li>
-                <li>Maximum files per batch: 50 files</li>
-                <li>Supports nested ZIP files (unpacked recursively)</li>
             </ul>
         </div>
     </div>
 
     <script>
         const uploadArea = document.getElementById('uploadArea');
-        const fileInput  = document.getElementById('id_files');  // persistent reference
+        const fileInput  = document.getElementById('id_files');
+        const folderInput = document.getElementById('id_folder');
+        const selectFilesBtn = document.getElementById('selectFilesBtn');
+        const selectFolderBtn = document.getElementById('selectFolderBtn');
         const submitBtn  = document.getElementById('submitBtn');
         const form       = document.getElementById('uploadForm');
         const preview    = document.getElementById('filePreview');
+        
+        let activeInput = fileInput; // Track which input is active
 
         function renderPreview(files) {
             if (!files || files.length === 0) {
@@ -147,21 +189,38 @@
             }
             let totalSize = 0;
             let html = '<div style="margin-top:10px;">';
+            
+            // Group files by folder for better visualization
+            const filesByFolder = {};
             for (const f of files) {
                 totalSize += f.size;
-                const sizeKB = Math.round(f.size / 1024);
-                html += `<div style="margin:5px 0; padding:5px; background:#f8f9fa; border-radius:3px;">
-                           📄 ${f.name} (${sizeKB} KB)
-                         </div>`;
+                const pathParts = f.webkitRelativePath || f.name;
+                const folder = pathParts.includes('/') ? pathParts.split('/')[0] : 'Files';
+                if (!filesByFolder[folder]) filesByFolder[folder] = [];
+                filesByFolder[folder].push(f);
             }
+            
+            // Display grouped files
+            for (const [folder, folderFiles] of Object.entries(filesByFolder)) {
+                if (Object.keys(filesByFolder).length > 1) {
+                    html += `<div style="margin:10px 0; font-weight:bold; color:#007bff;">📁 ${folder}</div>`;
+                }
+                for (const f of folderFiles) {
+                    const sizeKB = Math.round(f.size / 1024);
+                    const displayName = f.webkitRelativePath || f.name;
+                    html += `<div style="margin:5px 0 5px 20px; padding:5px; background:#f8f9fa; border-radius:3px; font-size:13px;">
+                               📄 ${displayName} (${sizeKB} KB)
+                             </div>`;
+                }
+            }
+            
             const totalMB = Math.round((totalSize / (1024 * 1024)) * 100) / 100;
             html += `<div style="margin-top:8px;">✅ ${files.length} file(s) selected (${totalMB} MB total)</div>`;
-            html += `<div style="color:#666; font-size:14px;">Click the box to change files</div>`;
             html += '</div>';
             preview.innerHTML = html;
         }
 
-        // Drag & Drop handlers
+        // Drag & Drop handlers - supports both files and folders
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('dragover');
@@ -171,29 +230,84 @@
             uploadArea.classList.remove('dragover');
         });
 
-        uploadArea.addEventListener('drop', (e) => {
+        uploadArea.addEventListener('drop', async (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
 
-            // Build a DataTransfer so assignment is safe
             const dt = new DataTransfer();
-            for (const file of e.dataTransfer.files) dt.items.add(file);
-            fileInput.files = dt.files;        // assign to the SAME persistent input
-            renderPreview(fileInput.files);    // update list
+            const items = e.dataTransfer.items;
+            
+            if (items) {
+                // Handle folder drops
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i].webkitGetAsEntry();
+                    if (item) {
+                        await scanFiles(item, '', dt);
+                    }
+                }
+            } else {
+                // Fallback for simple file drops
+                for (const file of e.dataTransfer.files) {
+                    dt.items.add(file);
+                }
+            }
+            
+            fileInput.files = dt.files;
+            activeInput = fileInput;
+            renderPreview(fileInput.files);
         });
 
-        // Click to open file chooser
-        uploadArea.addEventListener('click', () => fileInput.click());
+        // Recursive function to scan folder contents
+        async function scanFiles(item, path, dataTransfer) {
+            if (item.isFile) {
+                const file = await new Promise(resolve => item.file(resolve));
+                dataTransfer.items.add(file);
+            } else if (item.isDirectory) {
+                const dirReader = item.createReader();
+                const entries = await new Promise(resolve => dirReader.readEntries(resolve));
+                for (const entry of entries) {
+                    await scanFiles(entry, path + item.name + '/', dataTransfer);
+                }
+            }
+        }
 
-        // Standard file picker change
-        fileInput.addEventListener('change', () => renderPreview(fileInput.files));
+        // Button handlers
+        selectFilesBtn.addEventListener('click', () => {
+            activeInput = fileInput;
+            fileInput.click();
+        });
 
-        // Optional: client-side limits (match your UI text)
+        selectFolderBtn.addEventListener('click', () => {
+            activeInput = folderInput;
+            folderInput.click();
+        });
+
+        // Click upload area to select files
+        uploadArea.addEventListener('click', () => {
+            activeInput = fileInput;
+            fileInput.click();
+        });
+
+        // File input change handlers
+        fileInput.addEventListener('change', () => {
+            activeInput = fileInput;
+            // Disable other input to ensure only one is submitted
+            folderInput.disabled = true;
+            renderPreview(fileInput.files);
+        });
+
+        folderInput.addEventListener('change', () => {
+            activeInput = folderInput;
+            // Disable other input to ensure only one is submitted
+            fileInput.disabled = true;
+            renderPreview(folderInput.files);
+        });
+
+        // Client-side validation
         function violatesLimits(files) {
             const SINGLE_MAX = 100 * 1024 * 1024; // 100 MB
             const TOTAL_MAX  = 200 * 1024 * 1024; // 200 MB
-            const MAX_FILES  = 50;
-            if (files.length > MAX_FILES) return `Too many files (max ${MAX_FILES}).`;
+            // Remove MAX_FILES limit for folder uploads with many small files
             let total = 0;
             for (const f of files) {
                 if (f.size > SINGLE_MAX) return `File "${f.name}" exceeds 100 MB.`;
@@ -204,7 +318,13 @@
         }
 
         form.addEventListener('submit', (e) => {
-            const files = fileInput.files;
+            const files = activeInput.files;
+            if (!files || files.length === 0) {
+                e.preventDefault();
+                alert('Please select files or a folder to upload.');
+                return;
+            }
+            
             const err = violatesLimits(files);
             if (err) {
                 e.preventDefault();
