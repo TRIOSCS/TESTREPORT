@@ -13,8 +13,8 @@ class FileCollector:
     """Handles file collection, validation, and extraction"""
     
     def __init__(self):
-        self.max_single_file_size = 100 * 1024 * 1024  # 100MB
-        self.max_total_size = 200 * 1024 * 1024  # 200MB
+        self.max_single_file_size = 500 * 1024 * 1024  # 500MB
+        self.max_total_size = 500 * 1024 * 1024  # 500MB
         self.max_files = 50
         self.supported_extensions = {'.html', '.txt', '.pdf'}
     
