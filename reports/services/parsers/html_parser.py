@@ -42,9 +42,13 @@ REALLOC_PATTERNS = [
     re.compile(r'Reallocated\s*Sectors?\s*[:\-]?\s*(\d+)', re.IGNORECASE),
     re.compile(r'Allocated\s*Sections\s*[:\-]?\s*(\d+)', re.IGNORECASE),
     re.compile(r'\bReallocated\s*[:\-]?\s*(\d+)', re.IGNORECASE),
+    # For SAS drives - Primary defect list count is analogous to reallocated sectors
+    re.compile(r'Primary\s+defect\s+list\s+count\s*(\d[\d,]*)', re.IGNORECASE),
 ]
 
 GROWN_DEFECT_PATTERNS = [
+    # "Grown defect list count" format from Hard Disk Sentinel HTML (value after label in table)
+    re.compile(r'Grown\s+defect\s+list\s+count\s*(\d[\d,]*)', re.IGNORECASE),
     re.compile(r'Grown\s*Defect(?:\s*Count)?\s*[:\-]?\s*(\d+)', re.IGNORECASE),
     re.compile(r'Grown\s*Defects\s*[:\-]?\s*(\d+)', re.IGNORECASE),
     re.compile(r'\bDefect\s*Count\s*[:\-]?\s*(\d+)', re.IGNORECASE),
@@ -73,6 +77,17 @@ def clean_single_line(value: str) -> str:
         return ""
     value = value.splitlines()[0]
     return re.sub(r'\s+', ' ', value).strip()
+
+
+def parse_int_with_commas(value: str) -> int:
+    """Parse an integer that may contain commas (e.g., '19,129' -> 19129)"""
+    if not value:
+        return 0
+    try:
+        # Remove commas and convert to int
+        return int(value.replace(',', ''))
+    except (ValueError, AttributeError):
+        return 0
 
 
 def split_into_drive_sections(text: str) -> List[str]:
@@ -173,15 +188,8 @@ class HTMLParser(ParserBase):
                 except Exception:
                     health_val = 0
                 
-                try:
-                    realloc_val = int(realloc) if realloc else 0
-                except Exception:
-                    realloc_val = 0
-                
-                try:
-                    grown_val = int(grown) if grown else 0
-                except Exception:
-                    grown_val = 0
+                realloc_val = parse_int_with_commas(realloc)
+                grown_val = parse_int_with_commas(grown)
                 
                 rows.append({
                     "Label Serial": label,
@@ -277,15 +285,8 @@ class HTMLParser(ParserBase):
         except Exception:
             health_val = 0
         
-        try:
-            realloc_val = int(realloc) if realloc else 0
-        except Exception:
-            realloc_val = 0
-        
-        try:
-            grown_val = int(grown) if grown else 0
-        except Exception:
-            grown_val = 0
+        realloc_val = parse_int_with_commas(realloc)
+        grown_val = parse_int_with_commas(grown)
         
         return {
             "Label Serial": label,

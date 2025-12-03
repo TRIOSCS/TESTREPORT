@@ -10,6 +10,17 @@ from ..vendor import derive_vendor
 logger = logging.getLogger(__name__)
 
 
+def parse_int_with_commas(value: str) -> int:
+    """Parse an integer that may contain commas (e.g., '19,129' -> 19129)"""
+    if not value:
+        return 0
+    try:
+        # Remove commas and convert to int
+        return int(value.replace(',', ''))
+    except (ValueError, AttributeError):
+        return 0
+
+
 class PDFParser(ParserBase):
     """
     Parser for single-drive PDF diagnostics (e.g., SCSI Toolbox logs).
@@ -140,13 +151,7 @@ class PDFParser(ParserBase):
             row["Health Score"] = int(health) if health else None
         except Exception:
             row["Health Score"] = None
-        try:
-            row["Allocated Sections"] = int(realloc) if realloc else 0
-        except Exception:
-            row["Allocated Sections"] = 0
-        try:
-            row["Grown Defects"] = int(grown) if grown else 0
-        except Exception:
-            row["Grown Defects"] = 0
+        row["Allocated Sections"] = parse_int_with_commas(realloc)
+        row["Grown Defects"] = parse_int_with_commas(grown)
 
         return row

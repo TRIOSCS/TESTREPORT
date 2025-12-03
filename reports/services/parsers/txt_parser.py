@@ -9,6 +9,17 @@ from ..vendor import derive_vendor
 logger = logging.getLogger(__name__)
 
 
+def parse_int_with_commas(value: str) -> int:
+    """Parse an integer that may contain commas (e.g., '19,129' -> 19129)"""
+    if not value:
+        return 0
+    try:
+        # Remove commas and convert to int
+        return int(value.replace(',', ''))
+    except (ValueError, AttributeError):
+        return 0
+
+
 class TXTParser(ParserBase):
     """Parser for TXT Hard Disk Sentinel reports (robust, block-based)."""
 
@@ -95,8 +106,12 @@ class TXTParser(ParserBase):
         re.compile(r"Reallocated\s*Sector(?:s)?\s*(?:Count|Co\.\.)\s*(?:\s*\.\s*)*:\s*(\d+)", re.IGNORECASE),
         re.compile(r"\bReallocated\s*Sectors?\s*(?:\s*\.\s*)*:\s*(\d+)", re.IGNORECASE),
         re.compile(r"\bReallocated\s*(?:\s*\.\s*)*:\s*(\d+)", re.IGNORECASE),
+        # For SAS drives - Primary defect list count (with spaces and possible commas)
+        re.compile(r"Primary\s+defect\s+list\s+count\s+([\d,]+)", re.IGNORECASE),
     ]
     _RE_GROWN = [
+        # "Grown defect list count" format (value after spaces, may have commas like "19,129")
+        re.compile(r"Grown\s+defect\s+list\s+count\s+([\d,]+)", re.IGNORECASE),
         re.compile(r"Grown\s*Defect(?:s)?(?:\s*List)?(?:\s*Count)?\s*(?:\s*\.\s*)*:\s*(\d+)", re.IGNORECASE),
         re.compile(r"\bGrown\s*Defects?\s*(?:\s*\.\s*)*:\s*(\d+)", re.IGNORECASE),
         re.compile(r"\bDefect\s*Count\s*(?:\s*\.\s*)*:\s*(\d+)", re.IGNORECASE),
@@ -190,14 +205,8 @@ class TXTParser(ParserBase):
             drive["Health Score"] = int(health) if health else None
         except Exception:
             drive["Health Score"] = None
-        try:
-            drive["Allocated Sections"] = int(realloc) if realloc else 0
-        except Exception:
-            drive["Allocated Sections"] = 0
-        try:
-            drive["Grown Defects"] = int(grown) if grown else 0
-        except Exception:
-            drive["Grown Defects"] = 0
+        drive["Allocated Sections"] = parse_int_with_commas(realloc)
+        drive["Grown Defects"] = parse_int_with_commas(grown)
 
         return drive
 
