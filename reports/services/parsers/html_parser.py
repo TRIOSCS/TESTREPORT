@@ -42,8 +42,6 @@ REALLOC_PATTERNS = [
     re.compile(r'Reallocated\s*Sectors?\s*[:\-]?\s*(\d+)', re.IGNORECASE),
     re.compile(r'Allocated\s*Sections\s*[:\-]?\s*(\d+)', re.IGNORECASE),
     re.compile(r'\bReallocated\s*[:\-]?\s*(\d+)', re.IGNORECASE),
-    # For SAS drives - Primary defect list count is analogous to reallocated sectors
-    re.compile(r'Primary\s+defect\s+list\s+count\s*(\d[\d,]*)', re.IGNORECASE),
 ]
 
 GROWN_DEFECT_PATTERNS = [

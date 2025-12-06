@@ -106,8 +106,8 @@ class TXTParser(ParserBase):
         re.compile(r"Reallocated\s*Sector(?:s)?\s*(?:Count|Co\.\.)\s*(?:\s*\.\s*)*:\s*(\d+)", re.IGNORECASE),
         re.compile(r"\bReallocated\s*Sectors?\s*(?:\s*\.\s*)*:\s*(\d+)", re.IGNORECASE),
         re.compile(r"\bReallocated\s*(?:\s*\.\s*)*:\s*(\d+)", re.IGNORECASE),
-        # For SAS drives - Primary defect list count (with spaces and possible commas)
-        re.compile(r"Primary\s+defect\s+list\s+count\s+([\d,]+)", re.IGNORECASE),
+        # # For SAS drives - Primary defect list count (with spaces and possible commas)
+        # re.compile(r"Primary\s+defect\s+list\s+count\s+([\d,]+)", re.IGNORECASE),
     ]
     _RE_GROWN = [
         # "Grown defect list count" format (value after spaces, may have commas like "19,129")
